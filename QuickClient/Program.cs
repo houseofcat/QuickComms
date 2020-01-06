@@ -11,8 +11,11 @@ namespace QuickClient
 
         public static async Task Main(string[] args)
         {
+            await Task.Delay(5000).ConfigureAwait(false);
+            await Console.Out.WriteLineAsync("Starting the client connection now...").ConfigureAwait(false);
+
             var quickSocket = await QuickSocketFactory
-                .GetTcpStreamSocketAsync("192.168.50.176", 5001, false, true)
+                .GetTcpStreamSocketAsync("127.0.0.1", 5001, true)
                 .ConfigureAwait(false);
 
             await quickSocket
@@ -28,6 +31,8 @@ namespace QuickClient
                     .QueueForWritingAsync(new Message { MessageId = i, Data = "Hello World" })
                     .ConfigureAwait(false);
             }
+
+            await Console.In.ReadLineAsync();
         }
     }
 }

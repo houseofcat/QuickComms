@@ -1,4 +1,5 @@
 ﻿using QuickComms.Network;
+using System.Buffers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Channels;
@@ -9,6 +10,7 @@ namespace QuickComms
 {
     public class QuickWriter<TSend>
     {
+        public QuickSocket QuickSocket { get; }
         public NetworkStream NetStream { get; }
         public bool Write { get; private set; }
 
@@ -20,6 +22,7 @@ namespace QuickComms
 
         public QuickWriter(QuickSocket quickSocket)
         {
+            QuickSocket = quickSocket;
             NetStream = new NetworkStream(quickSocket.Socket);
             MessageChannel = Channel.CreateUnbounded<TSend>();
             MessageChannelWriter = MessageChannel.Writer;
@@ -58,11 +61,36 @@ namespace QuickComms
                         .ReadAsync()
                         .ConfigureAwait(false);
 
-                    await NetStream.WriteAsync(JsonSerializer.Serialize(itemToSend));
+                    await NetStream
+                        .WriteAsync(CreatePayload(itemToSend));
                 }
             }
 
             await StopWriteAsync().ConfigureAwait(false);
+        }
+
+        private const byte TerminatingByte = (byte)'\n';
+
+        private byte[] CreatePayload(TSend itemToSend)
+        {
+            var bytes = JsonSerializer.Serialize(itemToSend);
+            byte[] payload = null;
+
+            try
+            {
+                payload = ArrayPool<byte>.Shared.Rent(bytes.Length + 1);
+                bytes.CopyTo(payload, 0);
+                payload[payload.Length - 1] = TerminatingByte;
+
+                return payload;
+            }
+            finally
+            {
+                if (payload != null)
+                {
+                    ArrayPool<byte>.Shared.Return(payload);
+                }
+            }
         }
 
         public async Task StopWriteAsync()

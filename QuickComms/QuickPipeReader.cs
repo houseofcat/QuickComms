@@ -12,8 +12,9 @@ namespace QuickComms
 {
     public class QuickPipeReader<TReceived>
     {
-        public NetworkStream NetStream { get; }
-        public PipeReader PipeReader { get; }
+        public QuickSocket QuickSocket { get; }
+        public NetworkStream NetStream { get; private set; }
+        public PipeReader PipeReader { get; private set; }
         public bool Receive { get; private set; }
 
         private Task ReceiveLoopTask { get; set; }
@@ -23,33 +24,8 @@ namespace QuickComms
 
         public QuickPipeReader(QuickSocket quickSocket)
         {
-            NetStream = new NetworkStream(quickSocket.Socket);
-            PipeReader = PipeReader.Create(NetStream);
-            MessageChannel = Channel.CreateUnbounded<TReceived>();
-            MessageChannelReader = MessageChannel.Reader;
-        }
+            QuickSocket = quickSocket;
 
-        public QuickPipeReader(Socket socket)
-        {
-            NetStream = new NetworkStream(socket);
-            PipeReader = PipeReader.Create(NetStream);
-            MessageChannel = Channel.CreateUnbounded<TReceived>();
-            MessageChannelReader = MessageChannel.Reader;
-        }
-
-        public QuickPipeReader(NetworkStream netStream)
-        {
-            NetStream = netStream;
-            PipeReader = PipeReader.Create(netStream);
-            MessageChannel = Channel.CreateUnbounded<TReceived>();
-            MessageChannelReader = MessageChannel.Reader;
-        }
-
-        public QuickPipeReader(Pipe pipe)
-        {
-            PipeReader = pipe.Reader;
-            NetStream = (NetworkStream)pipe.Reader.AsStream();
-            PipeLock = new SemaphoreSlim(1, 1);
             MessageChannel = Channel.CreateUnbounded<TReceived>();
             MessageChannelReader = MessageChannel.Reader;
         }
@@ -59,9 +35,10 @@ namespace QuickComms
             await PipeLock.WaitAsync().ConfigureAwait(false);
 
             if (!Receive)
-            { Receive = true; }
-
-            ReceiveLoopTask = Task.Run(ReceiveAsync);
+            {
+                Receive = true;               
+                ReceiveLoopTask = Task.Run(ReceiveAsync);
+            }
 
             PipeLock.Release();
         }
@@ -70,7 +47,10 @@ namespace QuickComms
         {
             while (Receive)
             {
-                ReadResult result = await PipeReader.ReadAsync().ConfigureAwait(false);
+                using var stream = new NetworkStream(await QuickSocket.Socket.AcceptAsync().ConfigureAwait(false));
+                var pipeReader = PipeReader.Create(stream);
+
+                ReadResult result = await pipeReader.ReadAsync().ConfigureAwait(false);
                 ReadOnlySequence<byte> buffer = result.Buffer;
 
                 if (result.IsCanceled)
@@ -86,7 +66,9 @@ namespace QuickComms
                 }
 
                 // Buffer position was modified in TryReadSequence to include exact amounts consumed and read (if any).
-                PipeReader.AdvanceTo(buffer.Start, buffer.End);
+
+                if (buffer.Length > 0)
+                { PipeReader.AdvanceTo(buffer.Start, buffer.End); }
 
                 if (result.IsCompleted)
                 { break; }
