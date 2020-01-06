@@ -1,6 +1,7 @@
 ﻿using QuickComms.Network;
 using System;
 using System.Buffers;
+using System.IO;
 using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Threading;
@@ -19,13 +20,16 @@ namespace QuickComms
         private SemaphoreSlim PipeLock { get; } = new SemaphoreSlim(1, 1);
         private Channel<TReceived> MessageChannel { get; }
         public ChannelReader<TReceived> MessageChannelReader { get; }
+        public bool AttachedLengthReader { get; }
 
-        public QuickPipeReader(QuickSocket quickSocket)
+        public QuickPipeReader(QuickSocket quickSocket, bool attachedLength)
         {
             QuickSocket = quickSocket;
 
             MessageChannel = Channel.CreateUnbounded<TReceived>();
             MessageChannelReader = MessageChannel.Reader;
+
+            AttachedLengthReader = attachedLength;
         }
 
         public async Task StartReceiveAsync()
@@ -66,22 +70,35 @@ namespace QuickComms
                         if (result.IsCanceled)
                         { break; }
 
-                    // Trying to find all full sequences in the current buffer.
-                    while (TryReadSequence(ref buffer, out ReadOnlySequence<byte> line))
-                    {
-                        await MessageChannel
-                            .Writer
-                            .WriteAsync(JsonSerializer.Deserialize<TReceived>(line.ToArray()))
-                            .ConfigureAwait(false);
-                    }
+                        // Trying to find all full sequences in the current buffer.
+                        while (TryReadSequence(ref buffer, AttachedLengthReader, out ReadOnlySequence<byte> sequence))
+                        {
+                            await SendSequenceToChannelAsObjectAsync(sequence).ConfigureAwait(false);
+                        }
 
-                    // Buffer position was modified in TryReadSequence to include exact amounts consumed and read (if any).
-                    pipeReader.AdvanceTo(buffer.Start, buffer.End);
+                        // Buffer position was modified in TryReadSequence to include exact amounts consumed and read (if any).
+                        pipeReader.AdvanceTo(buffer.Start, buffer.End);
 
                         if (result.IsCompleted)
                         { break; }
                     }
                 }
+            }
+        }
+
+        private async Task SendSequenceToChannelAsObjectAsync(ReadOnlySequence<byte> sequence)
+        {
+            TReceived obj = default;
+            try
+            { obj = JsonSerializer.Deserialize<TReceived>(sequence.ToArray()); }
+            catch { }
+
+            if (obj != null)
+            {
+                await MessageChannel
+                    .Writer
+                    .WriteAsync(obj)
+                    .ConfigureAwait(false);
             }
         }
 
@@ -96,22 +113,47 @@ namespace QuickComms
         }
 
         private const byte TerminatingByte = (byte)'\n';
+        private const int SequenceLengthSize = 4;
 
-        private bool TryReadSequence(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> line)
+        private bool TryReadSequence(ref ReadOnlySequence<byte> buffer, bool lengthAttached, out ReadOnlySequence<byte> sequence)
         {
-            SequencePosition? position = buffer.PositionOf(TerminatingByte);
-
-            // If terminating character is not found, exit false.
-            if (position == null)
+            if (lengthAttached)
             {
-                line = default;
-                return false;
-            }
+                if (buffer.Length < SequenceLengthSize)
+                {
+                    sequence = default;
+                    return false;
+                }
 
-            // Get a readonly sequence upto the next line terminator but not including the last one.
-            line = buffer.Slice(0, position.Value);
-            buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
-            return true;
+                var attachedSequenceLength = BitConverter.ToInt32(buffer.Slice(0, SequenceLengthSize).ToArray(), 0);
+                //var attachedSequenceLength = BitConverter.ToInt32(buffer.Slice(0, SequenceLengthSize).FirstSpan);
+                if (attachedSequenceLength == 0 || (SequenceLengthSize + attachedSequenceLength) > buffer.Length)
+                {
+                    sequence = default;
+                    return false;
+                }
+
+                // Get a readonly sequence upto the next line terminator but not including the last one.
+                sequence = buffer.Slice(SequenceLengthSize, attachedSequenceLength);
+                buffer = buffer.Slice(SequenceLengthSize + attachedSequenceLength);
+                return true;
+            }
+            else
+            {
+                SequencePosition? position = buffer.PositionOf(TerminatingByte);
+
+                // If terminating character is not found, exit false.
+                if (position == null)
+                {
+                    sequence = default;
+                    return false;
+                }
+
+                // Get a readonly sequence upto the next line terminator but not including the last one.
+                sequence = buffer.Slice(0, position.Value);
+                buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
+                return true;
+            }
         }
     }
 }

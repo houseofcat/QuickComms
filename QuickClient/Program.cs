@@ -1,6 +1,7 @@
 ﻿using QuickComms;
 using QuickComms.Network;
 using System;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace QuickClient
@@ -10,9 +11,15 @@ namespace QuickClient
         private static QuickSocketFactory QuickSocketFactory { get; } = new QuickSocketFactory();
         private static QuickPipeReader<MessageReceipt> QuickPipeReader { get; set; }
         private static QuickWriter<Message> QuickWriter { get; set; }
+        private static XorShift XorShifter { get; set; }
+        private static string RandomPayload { get; set; }
 
         public static async Task Main()
         {
+            XorShifter = new XorShift(true);
+
+            RandomPayload = Encoding.UTF8.GetString(XorShifter.GetRandomBytes(50_000));
+
             await SetupClientAsync()
                 .ConfigureAwait(false);
 
@@ -23,7 +30,7 @@ namespace QuickClient
         {
             await Console.Out.WriteLineAsync("Starting the client with delay...").ConfigureAwait(false);
 
-            await Task.Delay(5000).ConfigureAwait(false);
+            await Task.Delay(2000).ConfigureAwait(false);
 
             await Console.Out.WriteLineAsync("Starting the client connection now...").ConfigureAwait(false);
 
@@ -31,8 +38,8 @@ namespace QuickClient
                 .GetTcpStreamSocketAsync("127.0.0.1", 5001, true)
                 .ConfigureAwait(false);
 
-            QuickPipeReader = new QuickPipeReader<MessageReceipt>(quickSocket);
-            QuickWriter = new QuickWriter<Message>(quickSocket);
+            QuickPipeReader = new QuickPipeReader<MessageReceipt>(quickSocket, true);
+            QuickWriter = new QuickWriter<Message>(quickSocket, true);
 
             await QuickWriter
                 .StartWritingAsync()
@@ -41,17 +48,157 @@ namespace QuickClient
             // Publish To Server
             _ = Task.Run(async () =>
             {
-                for (int i = 0; i < 10_000; i++)
+                while (true)
                 {
-                    var writeTask1 = QuickWriter
-                        .QueueForWritingAsync(new Message { MessageId = i++, Data = "Hello World1" });
+                    for (int i = 0; i < 10_000; i++)
+                    {
+                        await QuickWriter
+                            .QueueForWritingAsync(new Message { MessageId = i, Data = RandomPayload })
+                            .ConfigureAwait(false);
+                    }
 
-                    var writeTask2 = QuickWriter
-                        .QueueForWritingAsync(new Message { MessageId = i, Data = "Hello World2" });
-
-                    await Task.WhenAll(writeTask1, writeTask2).ConfigureAwait(false);
+                    await Task.Delay(1000).ConfigureAwait(false);
                 }
             });
+        }
+    }
+
+    public class XorShift
+    {
+        private Random Rand { get; } = new Random();
+
+        private uint X { get; set; }
+        private uint Y { get; set; }
+        private uint Z { get; set; }
+        private uint W { get; set; }
+
+        private const int Mask = 0xFF;
+
+        public XorShift()
+        {
+            X = 123456789;
+            Y = 362436069;
+            Z = 521288629;
+            W = 88675123;
+        }
+
+        public XorShift(bool reseed)
+        {
+            if (reseed)
+            {
+                var buffer = new byte[sizeof(uint)];
+                Rand.NextBytes(buffer);
+                X = BitConverter.ToUInt32(buffer);
+
+                buffer = new byte[sizeof(uint)];
+                Rand.NextBytes(buffer);
+                Y = BitConverter.ToUInt32(buffer);
+
+                buffer = new byte[sizeof(uint)];
+                Rand.NextBytes(buffer);
+                Z = BitConverter.ToUInt32(buffer);
+
+                buffer = new byte[sizeof(uint)];
+                Rand.NextBytes(buffer);
+                W = BitConverter.ToUInt32(buffer);
+            }
+        }
+
+        public byte[] GetRandomBytes(int size)
+        {
+            var buffer = new byte[size];
+            FillBuffer(buffer, 0, size);
+            return buffer;
+        }
+
+        public byte[] UnsafeGetRandomBytes(int size)
+        {
+            var buffer = new byte[size];
+            UnsafeFillBuffer(buffer, 0, size);
+            return buffer;
+        }
+
+        public void FillBuffer(byte[] buffer)
+        {
+            uint offset = 0, offsetEnd = (uint)buffer.Length;
+            while (offset < offsetEnd)
+            {
+                uint t = X ^ (X << 11);
+                X = Y; Y = Z; Z = W;
+                W = W ^ (W >> 19) ^ (t ^ (t >> 8));
+
+                if (offset < offsetEnd)
+                {
+                    buffer[offset++] = (byte)(W & Mask);
+                    buffer[offset++] = (byte)((W >> 8) & Mask);
+                    buffer[offset++] = (byte)((W >> 16) & Mask);
+                    buffer[offset++] = (byte)((W >> 24) & Mask);
+                }
+                else { break; }
+            }
+        }
+
+        public void FillBuffer(byte[] buffer, int offset, int offsetEnd)
+        {
+            while (offset < offsetEnd)
+            {
+                uint t = X ^ (X << 11);
+                X = Y; Y = Z; Z = W;
+                W = W ^ (W >> 19) ^ (t ^ (t >> 8));
+
+                if (offset < offsetEnd)
+                {
+                    buffer[offset++] = (byte)(W & Mask);
+                    buffer[offset++] = (byte)((W >> 8) & Mask);
+                    buffer[offset++] = (byte)((W >> 16) & Mask);
+                    buffer[offset++] = (byte)((W >> 24) & Mask);
+                }
+                else { break; }
+            }
+        }
+
+        public unsafe void UnsafeFillBuffer(byte[] buf)
+        {
+            uint x = X, y = Y, z = Z, w = W;
+            fixed (byte* pbytes = buf)
+            {
+                uint* pbuf = (uint*)(pbytes + 0);
+                uint* pend = (uint*)(pbytes + buf.Length);
+                while (pbuf < pend)
+                {
+                    uint tx = x ^ (x << 11);
+                    uint ty = y ^ (y << 11);
+                    uint tz = z ^ (z << 11);
+                    uint tw = w ^ (w << 11);
+                    *(pbuf++) = x = w ^ (w >> 19) ^ (tx ^ (tx >> 8));
+                    *(pbuf++) = y = x ^ (x >> 19) ^ (ty ^ (ty >> 8));
+                    *(pbuf++) = z = y ^ (y >> 19) ^ (tz ^ (tz >> 8));
+                    *(pbuf++) = w = z ^ (z >> 19) ^ (tw ^ (tw >> 8));
+                }
+            }
+            X = x; Y = y; Z = z; W = w;
+        }
+
+        public unsafe void UnsafeFillBuffer(byte[] buf, int offset, int offsetEnd)
+        {
+            uint x = X, y = Y, z = Z, w = W;
+            fixed (byte* pbytes = buf)
+            {
+                uint* pbuf = (uint*)(pbytes + offset);
+                uint* pend = (uint*)(pbytes + offsetEnd);
+                while (pbuf < pend)
+                {
+                    uint tx = x ^ (x << 11);
+                    uint ty = y ^ (y << 11);
+                    uint tz = z ^ (z << 11);
+                    uint tw = w ^ (w << 11);
+                    *(pbuf++) = x = w ^ (w >> 19) ^ (tx ^ (tx >> 8));
+                    *(pbuf++) = y = x ^ (x >> 19) ^ (ty ^ (ty >> 8));
+                    *(pbuf++) = z = y ^ (y >> 19) ^ (tz ^ (tz >> 8));
+                    *(pbuf++) = w = z ^ (z >> 19) ^ (tw ^ (tw >> 8));
+                }
+            }
+            X = x; Y = y; Z = z; W = w;
         }
     }
 }

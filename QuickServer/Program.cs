@@ -29,8 +29,8 @@ namespace QuickServer
 
             await Console.Out.WriteLineAsync("Socket now listening...").ConfigureAwait(false);
 
-            QuickPipeReader = new QuickPipeReader<Message>(quickSocket);
-            QuickWriter = new QuickWriter<MessageReceipt>(quickSocket);
+            QuickPipeReader = new QuickPipeReader<Message>(quickSocket, true);
+            QuickWriter = new QuickWriter<MessageReceipt>(quickSocket, true);
 
             await QuickPipeReader
                 .StartReceiveAsync()
