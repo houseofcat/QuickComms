@@ -1,7 +1,6 @@
 ﻿using QuickComms;
 using QuickComms.Network;
 using System;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace QuickServer
@@ -9,9 +8,18 @@ namespace QuickServer
     public static class Program
     {
         private static QuickSocketFactory QuickSocketFactory { get; } = new QuickSocketFactory();
-        private static Task AcceptConnectionsTask { get; set; }
+        private static QuickPipeReader<Message> QuickPipeReader { get; set; }
+        private static QuickWriter<MessageReceipt> QuickWriter { get; set; }
 
-        public static async Task Main(string[] args)
+        public static async Task Main()
+        {
+            await SetupServerAsync()
+                .ConfigureAwait(false);
+
+            await Console.In.ReadLineAsync().ConfigureAwait(false);
+        }
+
+        private static async Task SetupServerAsync()
         {
             await Console.Out.WriteLineAsync("Starting the server connection now...").ConfigureAwait(false);
 
@@ -19,27 +27,27 @@ namespace QuickServer
                 .GetTcpStreamSocketAsync("127.0.0.1", 5001, true)
                 .ConfigureAwait(false);
 
-            await quickSocket
-                .BindSocketToAddressAsync(100)
-                .ConfigureAwait(false);
-
             await Console.Out.WriteLineAsync("Socket now listening...").ConfigureAwait(false);
 
-            var quickPipeReader = new QuickPipeReader<Message>(quickSocket);
+            QuickPipeReader = new QuickPipeReader<Message>(quickSocket);
+            QuickWriter = new QuickWriter<MessageReceipt>(quickSocket);
 
-            await quickPipeReader
+            await QuickPipeReader
                 .StartReceiveAsync()
                 .ConfigureAwait(false);
 
-            await Console.Out.WriteLineAsync("PipeReader waiting to receive data...").ConfigureAwait(false);
-
-            await foreach(var message in quickPipeReader.MessageChannelReader.ReadAllAsync())
+            _ = Task.Run(async () =>
             {
-                await Console
-                    .Out
-                    .WriteLineAsync($"MessageId: {message.MessageId}\r\nData:{message.Data}\r\n")
-                    .ConfigureAwait(false);
-            }
+                await Console.Out.WriteLineAsync("PipeReader waiting to receive data...").ConfigureAwait(false);
+
+                await foreach (var message in QuickPipeReader.MessageChannelReader.ReadAllAsync())
+                {
+                    await Console
+                        .Out
+                        .WriteLineAsync($"MessageId: {message.MessageId}\r\nData: {message.Data}\r\n")
+                        .ConfigureAwait(false);
+                }
+            });
         }
     }
 }

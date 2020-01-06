@@ -10,7 +10,7 @@ namespace QuickComms.Network
         public DnsEntry DnsEntry { get; set; }
         public Socket Socket { get; set; }
         private SemaphoreSlim SockLock { get; } = new SemaphoreSlim(1, 1);
-        private Task AcceptConnectionTask;
+
         public bool Connected { get; private set; }
         public bool Listening { get; private set; }
 
@@ -22,6 +22,8 @@ namespace QuickComms.Network
 
             Socket.Bind(DnsEntry.Endpoint);
             Socket.Listen(pendingConnections);
+
+            Socket.NoDelay = true;
 
             Listening = true;
 
@@ -39,6 +41,8 @@ namespace QuickComms.Network
                     .ConnectAsync(DnsEntry.PrimaryAddress, DnsEntry.Port)
                     .ConfigureAwait(false);
 
+                Socket.NoDelay = true;
+
                 Connected = true;
             }
             SockLock.Release();
@@ -54,6 +58,8 @@ namespace QuickComms.Network
                 await Socket
                     .ConnectAsync(DnsEntry.Addresses, DnsEntry.Port)
                     .ConfigureAwait(false);
+
+                Socket.NoDelay = true;
 
                 Connected = true;
             }

@@ -13,8 +13,6 @@ namespace QuickComms
     public class QuickPipeReader<TReceived>
     {
         public QuickSocket QuickSocket { get; }
-        public NetworkStream NetStream { get; private set; }
-        public PipeReader PipeReader { get; private set; }
         public bool Receive { get; private set; }
 
         private Task ReceiveLoopTask { get; set; }
@@ -36,7 +34,12 @@ namespace QuickComms
 
             if (!Receive)
             {
-                Receive = true;               
+                Receive = true;
+
+                await QuickSocket
+                    .BindSocketToAddressAsync(100)
+                    .ConfigureAwait(false);
+
                 ReceiveLoopTask = Task.Run(ReceiveAsync);
             }
 
@@ -47,34 +50,39 @@ namespace QuickComms
         {
             while (Receive)
             {
-                using var stream = new NetworkStream(await QuickSocket.Socket.AcceptAsync().ConfigureAwait(false));
-                var pipeReader = PipeReader.Create(stream);
+                var localSocket = await QuickSocket.Socket.AcceptAsync().ConfigureAwait(false);
+                _ = Task.Run(() => ReceiveDataAsync(localSocket));
 
-                ReadResult result = await pipeReader.ReadAsync().ConfigureAwait(false);
-                ReadOnlySequence<byte> buffer = result.Buffer;
-
-                if (result.IsCanceled)
-                { break; }
-
-                // Trying to find all full sequences in the current buffer.
-                while (TryReadSequence(ref buffer, out ReadOnlySequence<byte> line))
+                async Task ReceiveDataAsync(Socket localSocket)
                 {
-                    await MessageChannel
-                        .Writer
-                        .WriteAsync(JsonSerializer.Deserialize<TReceived>(line.ToArray()))
-                        .ConfigureAwait(false);
+                    using var stream = new NetworkStream(localSocket);
+                    var pipeReader = PipeReader.Create(stream);
+
+                    while (true)
+                    {
+                        ReadResult result = await pipeReader.ReadAsync().ConfigureAwait(false);
+                        ReadOnlySequence<byte> buffer = result.Buffer;
+
+                        if (result.IsCanceled)
+                        { break; }
+
+                    // Trying to find all full sequences in the current buffer.
+                    while (TryReadSequence(ref buffer, out ReadOnlySequence<byte> line))
+                    {
+                        await MessageChannel
+                            .Writer
+                            .WriteAsync(JsonSerializer.Deserialize<TReceived>(line.ToArray()))
+                            .ConfigureAwait(false);
+                    }
+
+                    // Buffer position was modified in TryReadSequence to include exact amounts consumed and read (if any).
+                    pipeReader.AdvanceTo(buffer.Start, buffer.End);
+
+                        if (result.IsCompleted)
+                        { break; }
+                    }
                 }
-
-                // Buffer position was modified in TryReadSequence to include exact amounts consumed and read (if any).
-
-                if (buffer.Length > 0)
-                { PipeReader.AdvanceTo(buffer.Start, buffer.End); }
-
-                if (result.IsCompleted)
-                { break; }
             }
-
-            await StopReceiveAsync().ConfigureAwait(false);
         }
 
         public async Task StopReceiveAsync()

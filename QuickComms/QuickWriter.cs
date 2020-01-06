@@ -11,7 +11,6 @@ namespace QuickComms
     public class QuickWriter<TSend>
     {
         public QuickSocket QuickSocket { get; }
-        public NetworkStream NetStream { get; }
         public bool Write { get; private set; }
 
         private Task WriteLoopTask { get; set; }
@@ -23,7 +22,6 @@ namespace QuickComms
         public QuickWriter(QuickSocket quickSocket)
         {
             QuickSocket = quickSocket;
-            NetStream = new NetworkStream(quickSocket.Socket);
             MessageChannel = Channel.CreateUnbounded<TSend>();
             MessageChannelWriter = MessageChannel.Writer;
             MessageChannelReader = MessageChannel.Reader;
@@ -46,6 +44,10 @@ namespace QuickComms
             if (!Write)
             { Write = true; }
 
+            await QuickSocket
+                .ConnectToPrimaryAddressAsync()
+                .ConfigureAwait(false);
+
             WriteLoopTask = Task.Run(WriteAsync);
 
             PipeLock.Release();
@@ -53,6 +55,8 @@ namespace QuickComms
 
         private async Task WriteAsync()
         {
+            using var netStream = new NetworkStream(QuickSocket.Socket);
+
             while (Write)
             {
                 if (await MessageChannelReader.WaitToReadAsync().ConfigureAwait(false))
@@ -61,7 +65,7 @@ namespace QuickComms
                         .ReadAsync()
                         .ConfigureAwait(false);
 
-                    await NetStream
+                    await netStream
                         .WriteAsync(CreatePayload(itemToSend));
                 }
             }
@@ -80,7 +84,7 @@ namespace QuickComms
             {
                 payload = ArrayPool<byte>.Shared.Rent(bytes.Length + 1);
                 bytes.CopyTo(payload, 0);
-                payload[payload.Length - 1] = TerminatingByte;
+                payload[^1] = TerminatingByte;
 
                 return payload;
             }
