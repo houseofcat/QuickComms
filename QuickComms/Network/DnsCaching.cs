@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Options;
 using System;
 using System.Net;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace QuickComms.Network
@@ -38,19 +37,17 @@ namespace QuickComms.Network
                 dnsEntry = new DnsEntry
                 {
                     HostName = hostNameOrAddresss,
-                    Port = bindingPort
+                    Port = bindingPort,
+                    Addresses = await Dns.GetHostAddressesAsync(hostNameOrAddresss).ConfigureAwait(false),
                 };
 
                 if (overideAsLocal)
                 {
                     dnsEntry.PrimaryAddress = IPAddress.Loopback;
                     dnsEntry.Endpoint = new IPEndPoint(IPAddress.Loopback, bindingPort);
-                    dnsEntry.Addresses = await Dns.GetHostAddressesAsync(hostNameOrAddresss).ConfigureAwait(false);
                 }
                 else if (verbatimAddress)
                 {
-                    dnsEntry.Addresses = await Dns.GetHostAddressesAsync(hostNameOrAddresss).ConfigureAwait(false);
-
                     // Find verbatim IP address match based on the hostname or address.
                     for (int i = 0; i < dnsEntry.Addresses.Length; i++)
                     {
@@ -63,8 +60,6 @@ namespace QuickComms.Network
                 }
                 else
                 {
-                    dnsEntry.Addresses = await Dns.GetHostAddressesAsync(hostNameOrAddresss).ConfigureAwait(false);
-
                     // Find first non-Loopback address for PrimaryAddress.
                     for (int i = 0; i < dnsEntry.Addresses.Length; i++)
                     {

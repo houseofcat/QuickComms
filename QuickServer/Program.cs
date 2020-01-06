@@ -12,11 +12,15 @@ namespace QuickServer
         public static async Task Main(string[] args)
         {
             var quickSocket = await QuickSocketFactory
-                .GetTcpStreamSocketAsync("127.0.0.1", 5001, true)
+                .GetTcpStreamSocketAsync("127.0.0.1", 10001, true)
                 .ConfigureAwait(false);
 
             await quickSocket
-                .ConnectToPrimaryAddressAsync(true)
+                .ConnectToPrimaryAddressAsync()
+                .ConfigureAwait(false);
+
+            await quickSocket
+                .StartListeningToPrimaryAddressAsync(100)
                 .ConfigureAwait(false);
 
             var quickPipeReader = new QuickPipeReader<Message>(quickSocket);

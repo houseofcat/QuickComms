@@ -7,7 +7,7 @@ namespace QuickComms.Network
 {
     public class QuickSocketFactory
     {
-        private NetCaching DnsCaching { get; }
+        public NetCaching DnsCaching { get; }
         private ConcurrentDictionary<string, QuickSocket> Sockets { get; }
         private const string SocketKeyFormat = "{0}{1}:{2}:{3}";
         private const int CachingExpiryInHours = 1;

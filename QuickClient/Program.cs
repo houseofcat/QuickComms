@@ -16,7 +16,7 @@ namespace QuickClient
                 .ConfigureAwait(false);
 
             await quickSocket
-                .ConnectToPrimaryAddressAsync(false)
+                .ConnectToPrimaryAddressAsync()
                 .ConfigureAwait(false);
 
             var quickWriter = new QuickWriter<Message>(quickSocket);
