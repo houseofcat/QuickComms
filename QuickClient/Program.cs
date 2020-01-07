@@ -19,6 +19,7 @@ namespace QuickClient
         {
             XorShifter = new XorShift(true);
 
+            // Create a fixed sized random payload.
             RandomPayload = Encoding.UTF8.GetString(XorShifter.GetRandomBytes(10_000));
 
             await SetupClientAsync()
@@ -64,7 +65,7 @@ namespace QuickClient
                             .ConfigureAwait(false);
                     }
 
-                    //await Task.Delay(1000).ConfigureAwait(false);
+                    await Task.Delay(1000).ConfigureAwait(false);
                 }
             });
         }
