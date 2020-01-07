@@ -10,8 +10,8 @@ namespace QuickClient
     public static class Program
     {
         private static QuickSocketFactory QuickSocketFactory { get; } = new QuickSocketFactory();
-        private static QuickUtf8JsonReader<MessageReceipt> QuickPipeReader { get; set; }
-        private static QuickUtf8JsonWriter<Message> QuickWriter { get; set; }
+        private static QuickUtf8JsonReader<MessageReceipt> QuickJsonReader { get; set; }
+        private static QuickUtf8JsonWriter<Message> QuickJsonWriter { get; set; }
         private static XorShift XorShifter { get; set; }
         private static string RandomPayload { get; set; }
 
@@ -45,10 +45,10 @@ namespace QuickClient
 
             var framingStrategy = new TerminatedByteFrameStrategy();
 
-            QuickPipeReader = new QuickUtf8JsonReader<MessageReceipt>(quickListeningSocket, framingStrategy);
-            QuickWriter = new QuickUtf8JsonWriter<Message>(quickSocket, framingStrategy);
+            QuickJsonReader = new QuickUtf8JsonReader<MessageReceipt>(quickListeningSocket, framingStrategy);
+            QuickJsonWriter = new QuickUtf8JsonWriter<Message>(quickSocket, framingStrategy);
 
-            await QuickWriter
+            await QuickJsonWriter
                 .StartWritingAsync()
                 .ConfigureAwait(false);
 
@@ -59,7 +59,7 @@ namespace QuickClient
                 {
                     for (int i = 0; i < 5; i++)
                     {
-                        await QuickWriter
+                        await QuickJsonWriter
                             .QueueForWritingAsync(new Message { MessageId = i, Data = RandomPayload })
                             .ConfigureAwait(false);
                     }

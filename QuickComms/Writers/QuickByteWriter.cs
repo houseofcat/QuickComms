@@ -8,7 +8,7 @@ namespace QuickComms
 {
     public class QuickByteWriter : IQuickWriter<byte[]>
     {
-        public QuickSocket QuickSocket { get; }
+        public IQuickSocket QuickSocket { get; }
         public bool Write { get; private set; }
 
         private Task WriteLoopTask { get; set; }
@@ -20,7 +20,7 @@ namespace QuickComms
         private IFramingStrategy FramingStrategy { get; }
 
         public QuickByteWriter(
-            QuickSocket quickSocket,
+            IQuickSocket quickSocket,
             IFramingStrategy framingStrategy)
         {
             QuickSocket = quickSocket;
@@ -81,8 +81,8 @@ namespace QuickComms
 
                         // Return message to channel.
                         await MessageChannelWriter
-                        .WriteAsync(bytesArray)
-                        .ConfigureAwait(false);
+                            .WriteAsync(bytesArray)
+                            .ConfigureAwait(false);
                     }
                 }
             }

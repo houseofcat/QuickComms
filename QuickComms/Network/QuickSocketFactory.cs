@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 
 namespace QuickComms.Network
 {
-    public class QuickSocketFactory
+    public class QuickSocketFactory : IQuickSocketFactory
     {
-        public NetCaching DnsCaching { get; }
+        public DnsCaching DnsCaching { get; }
         private ConcurrentDictionary<string, QuickSocket> Sockets { get; }
         private ConcurrentDictionary<string, QuickListeningSocket> ListeningSockets { get; }
 
@@ -16,7 +16,7 @@ namespace QuickComms.Network
 
         public QuickSocketFactory()
         {
-            DnsCaching = new NetCaching(TimeSpan.FromHours(CachingExpiryInHours));
+            DnsCaching = new DnsCaching(TimeSpan.FromHours(CachingExpiryInHours));
             Sockets = new ConcurrentDictionary<string, QuickSocket>();
             ListeningSockets = new ConcurrentDictionary<string, QuickListeningSocket>();
         }
@@ -26,7 +26,7 @@ namespace QuickComms.Network
             return string.Format(SocketKeyFormat, protocolType, socketType, hostNameOrAddresss, bindingPort);
         }
 
-        public async ValueTask<QuickSocket> GetTcpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
+        public async ValueTask<IQuickSocket> GetTcpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
         {
             var key = GetSocketKey(ProtocolType.Tcp, SocketType.Stream, hostNameOrAddresss, bindingPort);
 
@@ -52,7 +52,7 @@ namespace QuickComms.Network
             }
         }
 
-        public async ValueTask<QuickSocket> GetUdpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
+        public async ValueTask<IQuickSocket> GetUdpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
         {
             var key = GetSocketKey(ProtocolType.Udp, SocketType.Stream, hostNameOrAddresss, bindingPort);
 
@@ -78,7 +78,7 @@ namespace QuickComms.Network
             }
         }
 
-        public async ValueTask<QuickListeningSocket> GetListeningTcpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
+        public async ValueTask<IQuickListeningSocket> GetListeningTcpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
         {
             var key = GetSocketKey(ProtocolType.Tcp, SocketType.Stream, hostNameOrAddresss, bindingPort);
 
@@ -104,7 +104,7 @@ namespace QuickComms.Network
             }
         }
 
-        public async ValueTask<QuickListeningSocket> GetListeningUdpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
+        public async ValueTask<IQuickListeningSocket> GetListeningUdpSocketAsync(string hostNameOrAddresss, int bindingPort, bool overideAsLocal = false, bool verbatimAddress = false)
         {
             var key = GetSocketKey(ProtocolType.Udp, SocketType.Stream, hostNameOrAddresss, bindingPort);
 

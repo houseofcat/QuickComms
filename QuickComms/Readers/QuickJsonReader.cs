@@ -1,5 +1,4 @@
-﻿using QuickComms.Network;
-using System.Buffers;
+﻿using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -11,7 +10,7 @@ namespace QuickComms
 {
     public class QuickJsonReader<TReceived> : IQuickReader<TReceived>
     {
-        public QuickListeningSocket QuickListeningSocket { get; }
+        public IQuickListeningSocket QuickListeningSocket { get; }
         public bool Receive { get; private set; }
 
         private Task ReceiveLoopTask { get; set; }
@@ -22,7 +21,7 @@ namespace QuickComms
         private IFramingStrategy FramingStrategy { get; }
 
         public QuickJsonReader(
-            QuickListeningSocket quickListeningSocket,
+            IQuickListeningSocket quickListeningSocket,
             IFramingStrategy framingStrategy)
         {
             QuickListeningSocket = quickListeningSocket;

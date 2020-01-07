@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace QuickComms.Network
 {
-    public class QuickListeningSocket
+    public class QuickListeningSocket : IQuickListeningSocket
     {
         public DnsEntry DnsEntry { get; set; }
         public Socket Socket { get; set; }

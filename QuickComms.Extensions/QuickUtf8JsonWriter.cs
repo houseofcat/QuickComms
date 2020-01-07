@@ -1,5 +1,4 @@
-﻿using QuickComms.Network;
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -9,7 +8,7 @@ namespace QuickComms.Extensions.Utf8Json
 {
     public class QuickUtf8JsonWriter<TSend> : IQuickWriter<TSend>
     {
-        public QuickSocket QuickSocket { get; }
+        public IQuickSocket QuickSocket { get; }
         public bool Write { get; private set; }
 
         private Task WriteLoopTask { get; set; }
@@ -21,7 +20,7 @@ namespace QuickComms.Extensions.Utf8Json
         private IFramingStrategy FramingStrategy { get; }
 
         public QuickUtf8JsonWriter(
-            QuickSocket quickSocket,
+            IQuickSocket quickSocket,
             IFramingStrategy framingStrategy)
         {
             QuickSocket = quickSocket;

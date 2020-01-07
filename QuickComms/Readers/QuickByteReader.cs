@@ -1,8 +1,6 @@
-﻿using QuickComms.Network;
-using System.Buffers;
+﻿using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -11,7 +9,7 @@ namespace QuickComms
 {
     public class QuickByteReader : IQuickReader<byte[]>
     {
-        public QuickListeningSocket QuickListeningSocket { get; }
+        public IQuickListeningSocket QuickListeningSocket { get; }
         public bool Receive { get; private set; }
 
         private Task ReceiveLoopTask { get; set; }
@@ -22,7 +20,7 @@ namespace QuickComms
         private IFramingStrategy FramingStrategy { get; }
 
         public QuickByteReader(
-            QuickListeningSocket quickListeningSocket,
+            IQuickListeningSocket quickListeningSocket,
             IFramingStrategy framingStrategy)
         {
             QuickListeningSocket = quickListeningSocket;

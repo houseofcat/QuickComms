@@ -11,7 +11,7 @@ namespace QuickComms.Extensions.Utf8Json
 {
     public class QuickUtf8JsonReader<TReceived> : IQuickReader<TReceived>
     {
-        public QuickListeningSocket QuickListeningSocket { get; }
+        public IQuickListeningSocket QuickListeningSocket { get; }
         public bool Receive { get; private set; }
 
         private Task ReceiveLoopTask { get; set; }
@@ -22,7 +22,7 @@ namespace QuickComms.Extensions.Utf8Json
         private IFramingStrategy FramingStrategy { get; }
 
         public QuickUtf8JsonReader(
-            QuickListeningSocket quickListeningSocket,
+            IQuickListeningSocket quickListeningSocket,
             IFramingStrategy framingStrategy)
         {
             QuickListeningSocket = quickListeningSocket;

@@ -9,8 +9,8 @@ namespace QuickServer
     public static class Program
     {
         private static QuickSocketFactory QuickSocketFactory { get; } = new QuickSocketFactory();
-        private static QuickUtf8JsonReader<Message> QuickPipeReader { get; set; }
-        private static QuickUtf8JsonWriter<MessageReceipt> QuickWriter { get; set; }
+        private static QuickUtf8JsonReader<Message> QuickJsonReader { get; set; }
+        private static QuickUtf8JsonWriter<MessageReceipt> QuickJsonWriter { get; set; }
 
         public static async Task Main()
         {
@@ -36,10 +36,10 @@ namespace QuickServer
 
             var framingStrategy = new TerminatedByteFrameStrategy();
 
-            QuickPipeReader = new QuickUtf8JsonReader<Message>(quickListeningSocket, framingStrategy);
-            QuickWriter = new QuickUtf8JsonWriter<MessageReceipt>(quickSocket, framingStrategy);
+            QuickJsonReader = new QuickUtf8JsonReader<Message>(quickListeningSocket, framingStrategy);
+            QuickJsonWriter = new QuickUtf8JsonWriter<MessageReceipt>(quickSocket, framingStrategy);
 
-            await QuickPipeReader
+            await QuickJsonReader
                 .StartReceiveAsync()
                 .ConfigureAwait(false);
 
@@ -47,7 +47,7 @@ namespace QuickServer
             {
                 await Console.Out.WriteLineAsync("PipeReader waiting to receive data...").ConfigureAwait(false);
 
-                await foreach (var message in QuickPipeReader.MessageChannelReader.ReadAllAsync())
+                await foreach (var message in QuickJsonReader.MessageChannelReader.ReadAllAsync())
                 {
                     await Console
                         .Out

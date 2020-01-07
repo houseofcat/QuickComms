@@ -6,15 +6,15 @@ using System.Threading.Tasks;
 
 namespace QuickComms.Network
 {
-    public class NetCaching
+    public class DnsCaching : IDnsCaching
     {
-        private readonly TimeSpan _timeout;
+        private readonly TimeSpan _expiration;
         private readonly MemoryCache _memoryCache = new MemoryCache(Options.Create(new MemoryCacheOptions()));
         private const string DnsKeyFormat = "{0}:{1}";
 
-        public NetCaching(TimeSpan timeout)
+        public DnsCaching(TimeSpan expiration)
         {
-            _timeout = timeout;
+            _expiration = expiration;
         }
 
         private string GetDnsKey(string hostName, int bindingPort)
@@ -71,10 +71,18 @@ namespace QuickComms.Network
                     }
                 }
 
-                _memoryCache.Set(key, dnsEntry, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = _timeout });
+                _memoryCache.Set(key, dnsEntry, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = _expiration });
 
                 return dnsEntry;
             }
+        }
+
+        public void RemoveDnsEntry(string hostNameOrAddresss, int bindingPort)
+        {
+            // See if we already have a cached DnsEntry
+            var key = GetDnsKey(hostNameOrAddresss, bindingPort);
+
+            _memoryCache.Remove(key);
         }
     }
 }

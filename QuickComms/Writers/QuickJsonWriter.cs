@@ -1,5 +1,4 @@
-﻿using QuickComms.Network;
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
@@ -9,7 +8,7 @@ namespace QuickComms
 {
     public class QuickJsonWriter<TSend> : IQuickWriter<TSend>
     {
-        public QuickSocket QuickSocket { get; }
+        public IQuickSocket QuickSocket { get; }
         public bool Write { get; private set; }
 
         private Task WriteLoopTask { get; set; }
@@ -21,7 +20,7 @@ namespace QuickComms
         private IFramingStrategy FramingStrategy { get; }
 
         public QuickJsonWriter(
-            QuickSocket quickSocket,
+            IQuickSocket quickSocket,
             IFramingStrategy framingStrategy)
         {
             QuickSocket = quickSocket;
@@ -84,8 +83,8 @@ namespace QuickComms
 
                         // Return message to channel.
                         await MessageChannelWriter
-                        .WriteAsync(itemToSend)
-                        .ConfigureAwait(false);
+                            .WriteAsync(itemToSend)
+                            .ConfigureAwait(false);
                     }
                 }
             }
