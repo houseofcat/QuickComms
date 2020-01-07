@@ -1,4 +1,5 @@
-﻿using QuickComms;
+﻿using QuickComms.Extensions.Utf8Json;
+using QuickComms.Framing;
 using QuickComms.Network;
 using System;
 using System.Text;
@@ -9,8 +10,8 @@ namespace QuickClient
     public static class Program
     {
         private static QuickSocketFactory QuickSocketFactory { get; } = new QuickSocketFactory();
-        private static QuickPipeReader<MessageReceipt> QuickPipeReader { get; set; }
-        private static QuickWriter<Message> QuickWriter { get; set; }
+        private static QuickUtf8JsonReader<MessageReceipt> QuickPipeReader { get; set; }
+        private static QuickUtf8JsonWriter<Message> QuickWriter { get; set; }
         private static XorShift XorShifter { get; set; }
         private static string RandomPayload { get; set; }
 
@@ -18,7 +19,7 @@ namespace QuickClient
         {
             XorShifter = new XorShift(true);
 
-            RandomPayload = Encoding.UTF8.GetString(XorShifter.GetRandomBytes(50_000));
+            RandomPayload = Encoding.UTF8.GetString(XorShifter.GetRandomBytes(10_000));
 
             await SetupClientAsync()
                 .ConfigureAwait(false);
@@ -35,11 +36,17 @@ namespace QuickClient
             await Console.Out.WriteLineAsync("Starting the client connection now...").ConfigureAwait(false);
 
             var quickSocket = await QuickSocketFactory
-                .GetTcpStreamSocketAsync("127.0.0.1", 5001, true)
+                .GetTcpSocketAsync("127.0.0.1", 15001, true)
                 .ConfigureAwait(false);
 
-            QuickPipeReader = new QuickPipeReader<MessageReceipt>(quickSocket, true);
-            QuickWriter = new QuickWriter<Message>(quickSocket, true);
+            var quickListeningSocket = await QuickSocketFactory
+                .GetListeningTcpSocketAsync("127.0.0.1", 15001, true)
+                .ConfigureAwait(false);
+
+            var framingStrategy = new TerminatedByteFrameStrategy();
+
+            QuickPipeReader = new QuickUtf8JsonReader<MessageReceipt>(quickListeningSocket, framingStrategy);
+            QuickWriter = new QuickUtf8JsonWriter<Message>(quickSocket, framingStrategy);
 
             await QuickWriter
                 .StartWritingAsync()
@@ -50,14 +57,14 @@ namespace QuickClient
             {
                 while (true)
                 {
-                    for (int i = 0; i < 10_000; i++)
+                    for (int i = 0; i < 5; i++)
                     {
                         await QuickWriter
                             .QueueForWritingAsync(new Message { MessageId = i, Data = RandomPayload })
                             .ConfigureAwait(false);
                     }
 
-                    await Task.Delay(1000).ConfigureAwait(false);
+                    //await Task.Delay(1000).ConfigureAwait(false);
                 }
             });
         }

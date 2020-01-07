@@ -1,7 +1,5 @@
 ﻿using QuickComms.Network;
-using System;
 using System.Buffers;
-using System.IO;
 using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Threading;
@@ -9,27 +7,29 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Utf8Json;
 
-namespace QuickComms
+namespace QuickComms.Extensions.Utf8Json
 {
-    public class QuickPipeReader<TReceived>
+    public class QuickUtf8JsonReader<TReceived> : IQuickReader<TReceived>
     {
-        public QuickSocket QuickSocket { get; }
+        public QuickListeningSocket QuickListeningSocket { get; }
         public bool Receive { get; private set; }
 
         private Task ReceiveLoopTask { get; set; }
         private SemaphoreSlim PipeLock { get; } = new SemaphoreSlim(1, 1);
         private Channel<TReceived> MessageChannel { get; }
         public ChannelReader<TReceived> MessageChannelReader { get; }
-        public bool AttachedLengthReader { get; }
 
-        public QuickPipeReader(QuickSocket quickSocket, bool attachedLength)
+        private IFramingStrategy FramingStrategy { get; }
+
+        public QuickUtf8JsonReader(
+            QuickListeningSocket quickListeningSocket,
+            IFramingStrategy framingStrategy)
         {
-            QuickSocket = quickSocket;
+            QuickListeningSocket = quickListeningSocket;
+            FramingStrategy = framingStrategy;
 
             MessageChannel = Channel.CreateUnbounded<TReceived>();
             MessageChannelReader = MessageChannel.Reader;
-
-            AttachedLengthReader = attachedLength;
         }
 
         public async Task StartReceiveAsync()
@@ -40,7 +40,7 @@ namespace QuickComms
             {
                 Receive = true;
 
-                await QuickSocket
+                await QuickListeningSocket
                     .BindSocketToAddressAsync(100)
                     .ConfigureAwait(false);
 
@@ -54,7 +54,7 @@ namespace QuickComms
         {
             while (Receive)
             {
-                var localSocket = await QuickSocket.Socket.AcceptAsync().ConfigureAwait(false);
+                var localSocket = await QuickListeningSocket.Socket.AcceptAsync().ConfigureAwait(false);
                 _ = Task.Run(() => ReceiveDataAsync(localSocket));
 
                 async Task ReceiveDataAsync(Socket localSocket)
@@ -71,7 +71,7 @@ namespace QuickComms
                         { break; }
 
                         // Trying to find all full sequences in the current buffer.
-                        while (TryReadSequence(ref buffer, AttachedLengthReader, out ReadOnlySequence<byte> sequence))
+                        while (FramingStrategy.TryReadSequence(ref buffer, out ReadOnlySequence<byte> sequence))
                         {
                             await SendSequenceToChannelAsObjectAsync(sequence).ConfigureAwait(false);
                         }
@@ -110,50 +110,6 @@ namespace QuickComms
             { Receive = false; }
 
             PipeLock.Release();
-        }
-
-        private const byte TerminatingByte = (byte)'\n';
-        private const int SequenceLengthSize = 4;
-
-        private bool TryReadSequence(ref ReadOnlySequence<byte> buffer, bool lengthAttached, out ReadOnlySequence<byte> sequence)
-        {
-            if (lengthAttached)
-            {
-                if (buffer.Length < SequenceLengthSize)
-                {
-                    sequence = default;
-                    return false;
-                }
-
-                var attachedSequenceLength = BitConverter.ToInt32(buffer.Slice(0, SequenceLengthSize).ToArray(), 0);
-                //var attachedSequenceLength = BitConverter.ToInt32(buffer.Slice(0, SequenceLengthSize).FirstSpan);
-                if (attachedSequenceLength == 0 || (SequenceLengthSize + attachedSequenceLength) > buffer.Length)
-                {
-                    sequence = default;
-                    return false;
-                }
-
-                // Get a readonly sequence upto the next line terminator but not including the last one.
-                sequence = buffer.Slice(SequenceLengthSize, attachedSequenceLength);
-                buffer = buffer.Slice(SequenceLengthSize + attachedSequenceLength);
-                return true;
-            }
-            else
-            {
-                SequencePosition? position = buffer.PositionOf(TerminatingByte);
-
-                // If terminating character is not found, exit false.
-                if (position == null)
-                {
-                    sequence = default;
-                    return false;
-                }
-
-                // Get a readonly sequence upto the next line terminator but not including the last one.
-                sequence = buffer.Slice(0, position.Value);
-                buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
-                return true;
-            }
         }
     }
 }

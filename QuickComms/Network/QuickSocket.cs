@@ -12,23 +12,8 @@ namespace QuickComms.Network
         private SemaphoreSlim SockLock { get; } = new SemaphoreSlim(1, 1);
 
         public bool Connected { get; private set; }
-        public bool Listening { get; private set; }
 
         private const string SocketNullErrorMessage = "Can't complete request because the Socket is null.";
-
-        public async Task BindSocketToAddressAsync(int pendingConnections)
-        {
-            await SockLock.WaitAsync().ConfigureAwait(false);
-
-            Socket.Bind(DnsEntry.Endpoint);
-            Socket.Listen(pendingConnections);
-
-            Socket.NoDelay = true;
-
-            Listening = true;
-
-            SockLock.Release();
-        }
 
         public async Task ConnectToPrimaryAddressAsync()
         {
@@ -71,10 +56,9 @@ namespace QuickComms.Network
             await SockLock.WaitAsync().ConfigureAwait(false);
             if (Connected)
             {
-                Socket.Shutdown(SocketShutdown.Both);
+                Socket.Shutdown(SocketShutdown.Send);
                 Socket.Close();
                 Connected = false;
-                Listening = false;
             }
             SockLock.Release();
         }

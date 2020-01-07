@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\QuickComms.Extensions\QuickComms.Extensions.Utf8Json.csproj" />
     <ProjectReference Include="..\QuickComms\QuickComms.csproj" />
   </ItemGroup>
 

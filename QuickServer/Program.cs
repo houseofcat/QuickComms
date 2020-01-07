@@ -1,4 +1,5 @@
-﻿using QuickComms;
+﻿using QuickComms.Extensions.Utf8Json;
+using QuickComms.Framing;
 using QuickComms.Network;
 using System;
 using System.Threading.Tasks;
@@ -8,8 +9,8 @@ namespace QuickServer
     public static class Program
     {
         private static QuickSocketFactory QuickSocketFactory { get; } = new QuickSocketFactory();
-        private static QuickPipeReader<Message> QuickPipeReader { get; set; }
-        private static QuickWriter<MessageReceipt> QuickWriter { get; set; }
+        private static QuickUtf8JsonReader<Message> QuickPipeReader { get; set; }
+        private static QuickUtf8JsonWriter<MessageReceipt> QuickWriter { get; set; }
 
         public static async Task Main()
         {
@@ -24,13 +25,19 @@ namespace QuickServer
             await Console.Out.WriteLineAsync("Starting the server connection now...").ConfigureAwait(false);
 
             var quickSocket = await QuickSocketFactory
-                .GetTcpStreamSocketAsync("127.0.0.1", 5001, true)
+                .GetTcpSocketAsync("127.0.0.1", 15001, true)
+                .ConfigureAwait(false);
+
+            var quickListeningSocket = await QuickSocketFactory
+                .GetListeningTcpSocketAsync("127.0.0.1", 15001, true)
                 .ConfigureAwait(false);
 
             await Console.Out.WriteLineAsync("Socket now listening...").ConfigureAwait(false);
 
-            QuickPipeReader = new QuickPipeReader<Message>(quickSocket, true);
-            QuickWriter = new QuickWriter<MessageReceipt>(quickSocket, true);
+            var framingStrategy = new TerminatedByteFrameStrategy();
+
+            QuickPipeReader = new QuickUtf8JsonReader<Message>(quickListeningSocket, framingStrategy);
+            QuickWriter = new QuickUtf8JsonWriter<MessageReceipt>(quickSocket, framingStrategy);
 
             await QuickPipeReader
                 .StartReceiveAsync()
