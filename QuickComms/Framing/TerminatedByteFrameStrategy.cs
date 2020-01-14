@@ -28,6 +28,7 @@ namespace QuickComms.Framing
             return true;
         }
 
+        // TODO: ReadOnlySequence instead of bytes??
         public async Task CreateFrameAndSendAsync(byte[] bytes, NetworkStream netStream)
         {
             var payload = SharedBytePool.Rent(bytes.Length + 1);

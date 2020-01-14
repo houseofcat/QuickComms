@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuickClient", "QuickClient\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuickServer", "QuickServer\QuickServer.csproj", "{C81F7EC0-E172-4C9E-917A-BD22967BE12A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickComms.Extensions.Utf8Json", "QuickComms.Extensions\QuickComms.Extensions.Utf8Json.csproj", "{F5860BCB-340E-426C-8199-A93B82F9119B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickComms.Extensions.Utf8Json", "QuickComms.Extensions.Utf8Json\QuickComms.Extensions.Utf8Json.csproj", "{F5860BCB-340E-426C-8199-A93B82F9119B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
